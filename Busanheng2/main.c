@@ -31,6 +31,8 @@ int state[3];	//상태. 0: 시민, 1:좀비, 2:마동석
 int aggro[2];		//어그로. 0:시민, 1:마동석
 char symbols[3] = { 'C', 'Z', 'M' }; //시민/좀비/마동석의 심볼
 int isSwitch = 0;	//턴 스위치
+int isHolding = 0; //붙잡기 여부. 0:아님, 1:붙잡고 있음
+int stamina = 0; //체력
 
 //입력 함수
 int Input(char *string, int min, int max) {
@@ -103,28 +105,33 @@ void print_ZombieState(int state) {
 
 //시민 전용 상태 출력함수
 void print_CitizenState(int state) {
-	if (state == 1) { //이동
+	if (state == 1) { //이동 (1은 결국 한발짝 움직였다는 것, 따라서 aggro가 무조건 1 상승한다.)
 		printf("citizen: %d -> %d (aggro: %d -> %d)\n", (pos[0] + 1), pos[0], (aggro[0] - 1), aggro[0]);
 	}
 	else if (state == 2) { //대기
+		//만약 대기가 0번 상태에서 대기라면?
 		printf("citizen: stay %d (aggro: %d -> %d)\n", pos[0], (aggro[0]+1), aggro[0]);
 	}
 }
 
 //마동석 전용 출력함수 (마동석 state와 어그로 변화량을 받음)
-void print_DongseokState(int state, int aggroDelta, int stamina) {
+void print_DongseokState(int state, int aggroDelta) {
 	if (state == 0) { //대기 (어그로1 감소)
-		printf("madongseok: stay %d (aggro: %d->%d, stamina: %d)\n", pos[2], (aggro[1] + 1), aggro[1], stamina);
+		if (aggro[0] - 1 == 0) {
+			printf("madongseok: stay %d (aggro: %d->%d, stamina: %d)\n", pos[2], (aggro[1]), aggro[1], stamina);
+		}
+		else {
+			printf("madongseok: stay %d (aggro: %d->%d, stamina: %d)\n", pos[2], (aggro[1] - aggroDelta), aggro[1], stamina);
+		}
 	}
 	else if (state == 1) { //이동(어그로1 증가)
-		printf("madongseok: %d -> %d (aggro: %d->%d, stamina: %d)\n", (pos[2] + 1), pos[2], (aggro[1] - 1), aggro[1], stamina);
+		printf("madongseok: %d -> %d (aggro: %d->%d, stamina: %d)\n", (pos[2] + 1), pos[2], (aggro[1] - aggroDelta), aggro[1], stamina);
 	}
 }
 
 //시민 이동 구현 (확률계산까지)
 int citizen_Move(int probability) {
 	int action = ((rand() % 100) < (100 - probability)) ? 1 : 2; //(100-p)%확률로 시민 이동
-	//action 자체는 잘 먹고 있음
 	if (action == 1) {
 		pos[0] -= 1; //이동
 		aggro_AddCal(0, 1); //어그로 1 증가
@@ -177,7 +184,7 @@ int zombie_Dicision_Dir() {
 
 //마동석 이동 : 
 // 0/1 입력받아서 행동, 기차 상태 출력
-void dongseok_Move(int train_length, int dongseok_state, int stamina) {
+void dongseok_Move(int train_length, int dongseok_state) {
 	printf("\n"); //좀비랑 인접해 있으면 '대기'만 가능
 	if (!(pos[2] - pos[1] <= 1)) { //만약 현재 거리가 1 이하가 아니라면
 		dongseok_state = Input("madongseok move(0:stay, 1:left)>>", 0, 1);
@@ -187,15 +194,143 @@ void dongseok_Move(int train_length, int dongseok_state, int stamina) {
 		pos[2] -= 1; //한칸 이동
 		aggro_AddCal(1, 1); //어그로 1 증가
 		print_TrainState(train_length); //기차 상태 출력
-		print_DongseokState(dongseok_state, 1, stamina); //마동석 상태 출력
+		print_DongseokState(dongseok_state, 1); //마동석 상태 출력
 	}
 	else { //0 입력시, 제자리에 대기 (바로 기차 상태 출력하니까 아무것도 안한다?)
 		aggro_AddCal(1, -1); //어그로 1 감소
 		print_TrainState(train_length); //열차 상태 출력
 		print_ZombieState(dongseok_state); //좀비 상태 출력
-		print_DongseokState(dongseok_state, 0, stamina); //마동석 상태 출력
+		print_DongseokState(dongseok_state, -1); //마동석 상태 출력
 	}
 }
+
+//시민 행동 함수
+int action_Citizen() {
+	if (pos[0] == 1) {
+		//탈출 성공
+		return 1;
+	}
+	else { //아무것도 하지 않음
+		printf("citizen does nothing.\n");
+		return 0;
+	}
+}
+
+//좀비 행동 함수 - 공격
+//class : 0시민 1마동석 2어그로기준
+int action_ZombieAttack(int class) {
+	switch (class)
+	{
+	case 0: //시민 공격
+		printf("GAME OVER! citizen dead...\n"); exit(0); //게임오버
+	case 1: //마동석 공격
+		stamina -= 1;
+		//만약, 공격으로 인해 체력이 STM_MIN이 되면 
+		if (stamina == STM_MIN) { printf("GAME OVER! madongseok dead...(%d)\n", stamina); exit(0); } //게임 오버
+		printf("Zombie attacked madongseok (aggro: %d vs. %d, madongseok stamina: %d -> %d)\n",
+			aggro[0], aggro[1], stamina+1, stamina);
+		return stamina; //생존
+		break;
+	case 2: //어그로 기준. 
+		//만약 시민 어그로가 마동석보다 더 높으면
+		if (aggro[0] > aggro[1]) { exit(0); } //시민 공격하고 게임 오버
+		else { return action_ZombieAttack(1); } //만약 마동석 어그로가 시민보다 더 높으면
+	}
+}
+
+//좀비 행동 함수
+int action_Zombie() {
+	int _distanceFromM = pos[2] - pos[1]; //마동석과의 거리
+	int _distanceFromC = pos[1] - pos[0]; //시민과의 거리
+	//인접한 인간을 공격
+	if ((_distanceFromM < _distanceFromC) && _distanceFromM <= 1) {
+		//만약 마동석이 시민보다 가깝고 인접하다면
+		return action_ZombieAttack(1); //마동석을 공격한다.
+	}
+	else if ((_distanceFromC < _distanceFromM) && _distanceFromC <= 1) {
+		//만약 시민이 마동석보다 가깝고 인접하다면
+		return action_ZombieAttack(0); //시민을 공격한다.
+	}
+	else if ((_distanceFromC == _distanceFromM) && _distanceFromC <= 1) {
+		//만약 둘다 가까이 있다면 : 어그로가 높은 쪽을 공격
+		return action_ZombieAttack(2);
+	}
+	else { //가까이 없다면 (안함)
+		printf("zombie attacked nobody.\n"); 
+	}
+}
+
+//마동석 행동 - 도발 (int로 바꿀 필요 없음)
+void action_Madongseok_Proveke() {
+	printf("madongseok provoked zombie...\n");
+	int _delta = AGGRO_MAX - aggro[1];
+	aggro[1] = AGGRO_MAX;
+	printf("madongseok: %d (aggro: %d -> %d, stamina: %d)\n", pos[2], (aggro[1]-_delta), aggro[1], stamina);
+}
+
+//마동석 행동 - 휴식
+int action_Madongseok_Rest() {
+	int _delta = aggro[1];
+	int _delta2 = stamina;
+	aggro_AddCal(1, -1); stamina += 1;
+	printf("madongseok rests...\n");
+	printf("madongseok: %d (aggro: %d -> %d, stamina: %d -> %d)\n", pos[2], _delta, aggro[1], stamina-1, stamina);
+	return stamina;
+}
+
+//인접한 경우
+int action_Madongseok_InputA(int probability) {
+	int _input = Input("madongseok move(0.rest, 1.provoke, 2.pull)>>", 0, 2);
+	int _delta = aggro[1]; int _staDelta = stamina;
+	switch (_input)
+	{
+	case 0: //휴식 (어그로 1 감소, 체력 1 증가)
+		return action_Madongseok_Rest(); break;
+	case 1: //도발 (어그로 AGGRO_MAX로 증가)
+		action_Madongseok_Proveke(); break;
+	case 2: //붙들기
+		isHolding = ((rand() % 100) < (100 - probability)) ? 1 : 0; //(100-p)%확률로 성공1, 실패0
+		aggro_AddCal(1, 2); stamina -= 1; //어그로 2 증가, 체력 1 감소
+		if (isHolding) { printf("madongseok pulled zombie... Next turn, it can't move\n"); } //붙들기 성공시
+		else { printf("madongseok failed to pull zombie\n"); } //붙들기 실패시
+		printf("madongseok: %d (aggro: %d -> %d, stamina: %d -> %d)\n", pos[2], _delta, aggro[1], _staDelta, stamina);
+		break;
+	}
+}
+
+//인접하지 않은 경우
+int action_Madongseok_InputB() {
+	int _input = Input("madongseok move(0.rest, 1.provoke)>>", 0, 1);
+	switch (_input)
+	{
+	case 0: //휴식 (어그로 1 감소, 체력 1 증가)
+		return action_Madongseok_Rest(); break;
+	case 1: //도발 (어그로 AGGRO_MAX로 증가)
+		action_Madongseok_Proveke(); break;
+	}
+}
+
+//마동석 행동 : 좀비와 인접하지 않은 경우
+//1) 휴식 : 어그로1 감소, 체력 1 증가
+//2) 도발 : 어그로 최대로 증가
+
+//마동석 행동 : 좀비와 인접한 경우
+//1) 휴식 : 
+//2) 도발 : 
+//3) 붙들기 : 어그로 2 증가, 체력 1 감소, (100-p)%확률로 성공, 성공하면 좀비는 다음 턴 이동 불가.
+//(다음턴 <이동> 페이즈에 표시)
+int action_Madongseok(int probability) {
+	int _distanceFromZ = pos[2] - pos[1]; //좀비와의 거리
+	if (_distanceFromZ <= 1) { //좀비와 인접한 경우
+		//사용자 입력 발생 (0휴식, 1도발, 2붙들기)
+		return action_Madongseok_InputA(probability);
+	}
+	else { //좀비와 인접하지 않은 경우
+		//사용자 입력 발생 (0휴식, 1도발)
+		action_Madongseok_InputB();
+	}
+}
+
 
 //게임종료.
 void GameOver() { 
@@ -219,8 +354,8 @@ void GameOver() {
 int main() {
 	//변수
 	int train_length = 0;				// 열차 길이
-	int stamina = 0;					// 마동석 스태미나
 	int probability = 0;				// 이동 확률
+	int gameover = 0;					// 0: 게임 오버 아님, 1 : 게임 오버
 	srand((unsigned int)time(NULL));	//랜덤 모듈 초기화
 
 	//인트로
@@ -233,13 +368,12 @@ int main() {
 	init_Variables(train_length); //열차 길이에 따른 위치 초기화
 	print_TrainState(train_length); //초기 열차 상태
 
+	int counter = 1;
 	//★=====턴=====★
 	while (1)
 	{
-		if (pos[0] == 1 || pos[1] - pos[0] <= 1) {
-			break; //조건 체크후 반복문 탈출 (시민 탈출 조건 충족 OR 좀비-시민(=거리) 1이하)
-		}
-
+		
+		printf("%d턴\n", counter);
 		//★=====<이동> 페이즈=====★
 		//시민&좀비 이동
 		state[0] = citizen_Move(probability); //이동시 state=1, 정지시 state=2
@@ -250,13 +384,22 @@ int main() {
 		print_CitizenState(state[0]); //이동시 state[0] = 1; 정지시 state[0] = 
 		print_ZombieState(state[1]);
 		//마동석 이동
-		dongseok_Move(train_length, state[2], stamina);
+		dongseok_Move(train_length, state[2]);
 		//마동석 상태 출력
 
 		//★=====<행동> 페이즈=====★
 		//시민 행동
-		//좀비 행동
+		printf("\n");
+		if (action_Citizen()) { break; };
+
+		//좀비 행동 (stamina를 업데이트받는다)
+		action_Zombie();
+		
 		//마동석 행동
+		action_Madongseok(probability);
+		//printf("madongseok action(0.rest, 1.provoke)>>\n");
+		//마동석 입력 대기, 전용 함수 사용
+		counter+=1;
 	}
 
 	GameOver(); //아웃트로 - 종료상태 출력(성공/실패)
