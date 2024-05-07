@@ -145,13 +145,22 @@ int citizen_Move(int probability) {
 
 //좀비 이동 구현(확률계산까지)
 //신규 기능 : 좀비가 움직일 때는 무조건 어그로가 높은쪽, 같은 경우에는 시민방향
+//신규 기능 : isHolding이 1면 비활성화하고 이번턴 좀비 '이동' 불가
 int zombie_Move(int probability) {
 	if (!isSwitch) { //1턴일때
-		int action = ((rand() % 100) < (100 - probability)) ? 2 : 1;//(100-p)%의 확률로 제자리에 대기
-		isSwitch = 1; //턴스위칭
-		if (action == 1) //이동 가능
-			return zombie_Dicision_Dir(); //이동 실행
-		return action; 
+		if (!isHolding) {
+			printf("456456456");
+			int action = ((rand() % 100) < (100 - probability)) ? 2 : 1;//(100-p)%의 확률로 제자리에 대기
+			isSwitch = 1; //턴스위칭
+			if (action == 1) //이동 가능
+				return zombie_Dicision_Dir(); //이동 실행
+			return action;
+		}
+		else { //holding == 1
+			printf("12312312313");
+			isHolding = 0; //비활성화하고
+			return 3; //특수 정지
+		}
 	}
 	else { //2턴일때
 		isSwitch = 0; //턴스위칭
@@ -331,7 +340,6 @@ int action_Madongseok(int probability) {
 	}
 }
 
-
 //게임종료.
 void GameOver() { 
 	if (pos[0] == 1) {
@@ -372,7 +380,6 @@ int main() {
 	//★=====턴=====★
 	while (1)
 	{
-		
 		printf("%d턴\n", counter);
 		//★=====<이동> 페이즈=====★
 		//시민&좀비 이동
