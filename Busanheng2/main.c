@@ -155,7 +155,7 @@ void GameOver() {
 	if (pos[0] == 1) {
 		printf("SUCCESS!\n");
 		printf("citizen(s) escaped to the next train");
-		printf("\n============================");
+		printf("\n============================");//
 	}
 	else if (pos[1] - pos[0] <= 1) {
 		printf("GAME OVER!\n");
