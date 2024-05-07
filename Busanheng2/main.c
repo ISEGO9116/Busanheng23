@@ -26,16 +26,13 @@
 #define ACTION_PULL		2 //붙들기
 
 //전역 변수
-int pos[3]; // 0: 시민, 1: 좀비, 2: 마동석
+int pos[3];			// 0:시민, 1:좀비, 2:마동석
+int state[3];	//상태. 0: 시민, 1:좀비, 2:마동석
+int aggro[2];		//어그로. 0:시민, 1:마동석
 char symbols[3] = { 'C', 'Z', 'M' }; //시민/좀비/마동석의 심볼
-int aggro[2]; //어그로. 0: 시민, 1:마동석
-int isSwitch = 0; //턴 스위치
+int isSwitch = 0;	//턴 스위치
 
 //입력 함수
-// 파라미터로 문자열 train length(%d~%d)>> 넣고,
-// 범위값 LEN_MIN, LEN_MAX 넣고,
-// 자체적으로 do while로 오류없을때까지 입력받음
-// 내부적으로 scanf_s에 담아서 return해야 할 듯
 int Input(char *string, int min, int max) {
 	int _input;
 	do {
@@ -45,12 +42,28 @@ int Input(char *string, int min, int max) {
 	return _input;
 }
 
+//어그로를 증가/감소 시키는 함수(최대값 이후로는 최대값에 고정한다.)
+void aggro_AddCal(int aggro_index, int delta_num) {
+	aggro[aggro_index] += delta_num;
+	if (aggro[aggro_index] > AGGRO_MAX) {
+		aggro[aggro_index] = AGGRO_MAX; //최대치로 고정
+	}
+	else if (aggro[aggro_index] < AGGRO_MIN) {
+		aggro[aggro_index] = AGGRO_MIN;
+	}
+}
+
 //열차 상태 초기화
-void init_Train(int train_length) {
+void init_Variables(int train_length) {
 	pos[0] = train_length - 6; // 시민
 	pos[1] = train_length - 3; // 좀비
 	pos[2] = train_length - 2; // 마동석
-	isSwitch = 0; //기본 false
+	isSwitch = 0;	//기본 false
+	aggro[0] = 1;	// 시민 어그로
+	aggro[1] = 1;	// 마동석 어그로
+	state[0] = 0;	//시민 상태
+	state[1] = 0;	//좀비 상태
+	state[2] = 0;	//마동석 상태
 	printf("\n");
 }
 
@@ -75,82 +88,112 @@ void print_TrainState(int train_length) {
 	printf("\n");
 }
 
-//상태표
-void print_Status(char *string, int state, int pos) {
-	if (state == 1) { //1 : 이동 (좀비 전용)
-		printf("%s: %d -> %d\n", string, pos + 1, pos);
+//좀비 전용 상태 출력 함수
+void print_ZombieState(int state) {
+	if (state == 1) { //1 : 이동
+		printf("zombie: %d -> %d\n", (pos[1]+1), pos[1]);
 	}
 	else if (state == 2) { //2 : 정지
-		printf("%s: stay %d\n", string, pos);
+		printf("zombie: stay %d\n", pos[1]);
 	}
 	else if (state == 3) { //3 : 강제 정지
-		printf("%s: Stay %d (cannot move)\n", string, pos);
+		printf("zombie: Stay %d (cannot move)\n", pos[1]);
+	}
+}
+
+//시민 전용 상태 출력함수
+void print_CitizenState(int state) {
+	if (state == 1) { //이동
+		printf("citizen: %d -> %d (aggro: %d -> %d)\n", (pos[0] + 1), pos[0], (aggro[0] - 1), aggro[0]);
+	}
+	else if (state == 2) { //대기
+		printf("citizen: stay %d (aggro: %d -> %d)\n", pos[0], (aggro[0]+1), aggro[0]);
 	}
 }
 
 //마동석 전용 출력함수 (마동석 state와 어그로 변화량을 받음)
-// 1 : 휴식
-// 2 : 이동(어그로1 증가)
-void print_DongseokPrint(int state, int aggroDelta, int stamina) {
-	if (state == 0) { //휴식 (어그로1 감소)
-		aggro[1] = cal_AddSubForClampMax(aggro[1], -1, 5, AGGRO_MIN);
+void print_DongseokState(int state, int aggroDelta, int stamina) {
+	if (state == 0) { //대기 (어그로1 감소)
 		printf("madongseok: stay %d (aggro: %d->%d, stamina: %d)\n", pos[2], (aggro[1] + 1), aggro[1], stamina);
 	}
 	else if (state == 1) { //이동(어그로1 증가)
-		aggro[1] = cal_AddSubForClampMax(aggro[1], 1, AGGRO_MAX, 0); //5를 넘지 않는다.
 		printf("madongseok: %d -> %d (aggro: %d->%d, stamina: %d)\n", (pos[2] + 1), pos[2], (aggro[1] - 1), aggro[1], stamina);
 	}
 }
 
 //시민 이동 구현 (확률계산까지)
 int citizen_Move(int probability) {
-	//(100-p)%확률로 시민 이동
-	int _chance = rand() % 100;
-	if (_chance < (100-probability)) {
-		pos[0] -= 1;
-		return 1; //state: 시민 이동
+	int action = ((rand() % 100) < (100 - probability)) ? 1 : 2; //(100-p)%확률로 시민 이동
+	//action 자체는 잘 먹고 있음
+	if (action == 1) {
+		pos[0] -= 1; //이동
+		aggro_AddCal(0, 1); //어그로 1 증가
+		return 1;
 	}
-	else { //p%확률로 시민 대기
-		return 2; //state: 시민 대기(2)
+	else { //action == 2
+		aggro_AddCal(0, -1); //시민 대기 (어그로 1 감소)
+		return action; //p% 확률로 시민 대기
 	}
 }
 
 //좀비 이동 구현(확률계산까지)
+//신규 기능 : 좀비가 움직일 때는 무조건 어그로가 높은쪽, 같은 경우에는 시민방향
 int zombie_Move(int probability) {
-	if (!isSwitch) { //isSwitch가 0일때(첫실행)
-		//(100-p)%의 확률로 제자리에 대기
-		if ((rand() % 100) < (100 - probability)) {
-			isSwitch = 1; //턴스위칭
-			return 2; //좀비 대기
-		}
-		else { //p%의 확률로 1칸이동
-			pos[1] -= 1;
-			isSwitch = 1; //턴스위칭
-			return 1;
-		}
+	if (!isSwitch) { //1턴일때
+		int action = ((rand() % 100) < (100 - probability)) ? 2 : 1;//(100-p)%의 확률로 제자리에 대기
+		isSwitch = 1; //턴스위칭
+		if (action == 1) //이동 가능
+			return zombie_Dicision_Dir(); //이동 실행
+		return action; 
 	}
-	else { //isSwitch가 1일때
+	else { //2턴일때
 		isSwitch = 0; //턴스위칭
 		return 3; //강제 정지
-		//리턴 : state
+	}
+}
+
+//좀비 이동 방향 생성 함수
+//어그로 수치를 기반으로 0:왼쪽, 1:오른쪽
+int zombie_Dicision_Dir() {
+	int dir;
+	if (aggro[1] > aggro[0]) { //만약 마동석의 어그로수치가 시민보다 높다면
+		dir = 1; //이동 방향을 오른쪽으로 결정한다. 1
+		//만약 마동석과의 거리가 1이하라면(즉, 인접해있다면), 움직이지 않는다.
+		if (pos[2] - pos[1] <= 1) { return 2; }
+		else {
+			//아니라면, 이동방향으로 전진한다.
+			pos[1] += 1; return 1; //오른쪽으로 1칸 전진한다.
+		}
+	}
+	else { //만약 아니라면
+		dir = 0; //이동 방향을 왼쪽으로 결정한다. return 0
+		//만약 시민과의 거리가 1이하라면(즉, 인접해있다면), 움직이지 않는다.
+		if (pos[1] - pos[0] <= 1) { return 2; }
+		else { //아니라면, 이동방향으로 전진한다.
+			pos[1] -= 1; return 1; // 왼쪽으로 1칸 전진한다. 
+		}
 	}
 }
 
 //마동석 이동 : 
 // 0/1 입력받아서 행동, 기차 상태 출력
-void dongseok_Move(int train_length, int stamina) {
-	printf("\n");
-	int dongseok_state = Input("madongseok move(0:stay, 1:left)>>", 0, 1);
+void dongseok_Move(int train_length, int dongseok_state, int stamina) {
+	printf("\n"); //좀비랑 인접해 있으면 '대기'만 가능
+	if (!(pos[2] - pos[1] <= 1)) { //만약 현재 거리가 1 이하가 아니라면
+		dongseok_state = Input("madongseok move(0:stay, 1:left)>>", 0, 1);
+	}
+	else { dongseok_state = Input("madongseok move(0:stay)>>", 0, 0); }
 	if (dongseok_state) { //1 입력시,
 		pos[2] -= 1; //한칸 이동
+		aggro_AddCal(1, 1); //어그로 1 증가
 		print_TrainState(train_length); //기차 상태 출력
-		print_DongseokPrint(dongseok_state, 1, stamina); //마동석 상태 출력
+		print_DongseokState(dongseok_state, 1, stamina); //마동석 상태 출력
 	}
-	else { //0 입력시,
-		// 제자리에 대기 (바로 기차 상태 출력하니까 아무것도 안한다?)
-		print_TrainState(train_length);
-		print_Status("madongseok", dongseok_state, pos[2]);
-		print_DongseokPrint(dongseok_state, 0, stamina); //마동석 상태 출력
+	else { //0 입력시, 제자리에 대기 (바로 기차 상태 출력하니까 아무것도 안한다?)
+		aggro_AddCal(1, -1); //어그로 1 감소
+		print_TrainState(train_length); //열차 상태 출력
+		print_ZombieState(dongseok_state); //좀비 상태 출력
+		print_DongseokState(dongseok_state, 0, stamina); //마동석 상태 출력
 	}
 }
 
@@ -168,18 +211,7 @@ void GameOver() {
 	}
 }
 
-//숫자를 증가시키는 함수(최대값 이후로는 거부한다.)
-// cal_AddForClampMax(베이스 숫자, 증가치, 최대치)
-int cal_AddSubForClampMax(int num, int delta_num, int max_num, int min_num) {
-	num += delta_num;
-	if (num > max_num) {
-		num = max_num; //최대치로 고정
-	}
-	else if (num < min_num) {
-		num = min_num;
-	}
-	return num;
-}
+
 
 // =================================================================================
 
@@ -189,10 +221,6 @@ int main() {
 	int train_length = 0;				// 열차 길이
 	int stamina = 0;					// 마동석 스태미나
 	int probability = 0;				// 이동 확률
-	int citizen_state = 0;				// 시민 상태
-	int zombie_state = 0;				// 좀비 상태
-	int citizen_aggro = 1;		// 시민 어그로
-	int madongseok_aggro = 1;	// 마동석 어그로
 	srand((unsigned int)time(NULL));	//랜덤 모듈 초기화
 
 	//인트로
@@ -202,7 +230,7 @@ int main() {
 	train_length = Input("train length(%d~%d)>>", LEN_MIN, LEN_MAX);
 	stamina = Input("madongseok stamina(%d~%d)>>", STM_MIN, STM_MAX);
 	probability = Input("percentile probability 'p'(%d~%d)>>", PROB_MIN, PROB_MAX);
-	init_Train(train_length); //열차 길이에 따른 위치 초기화
+	init_Variables(train_length); //열차 길이에 따른 위치 초기화
 	print_TrainState(train_length); //초기 열차 상태
 
 	//★=====턴=====★
@@ -214,15 +242,15 @@ int main() {
 
 		//★=====<이동> 페이즈=====★
 		//시민&좀비 이동
-		citizen_state = citizen_Move(probability); //이동시 state=1, 정지시 state=2
-		zombie_state = zombie_Move(probability);
+		state[0] = citizen_Move(probability); //이동시 state=1, 정지시 state=2
+		state[1] = zombie_Move(probability);
 		//열차 상태 출력
 		print_TrainState(train_length);
 		//시민, 좀비 상태 출력
-		print_Status("citizen", citizen_state, pos[0]);
-		print_Status("zombie", zombie_state, pos[1]);
+		print_CitizenState(state[0]); //이동시 state[0] = 1; 정지시 state[0] = 
+		print_ZombieState(state[1]);
 		//마동석 이동
-		dongseok_Move(train_length, stamina); //수치 변동까지 완료
+		dongseok_Move(train_length, state[2], stamina);
 		//마동석 상태 출력
 
 		//★=====<행동> 페이즈=====★
