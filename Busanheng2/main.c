@@ -7,11 +7,18 @@
 #define PROB_MIN	10 // 확률
 #define PROB_MAX	90
 
-//commit test2
-
 //전역 변수
 int pos[3]; // 0: 시민, 1: 좀비, 2: 마동석
 char symbols[3] = { 'C', 'Z', 'M' }; //시민/좀비/마동석의 심볼
+int isSwitch = 0; //턴 스위치
+
+//열차 상태 초기화
+void initTrain(int train_length) {
+	pos[0] = train_length - 6; // 시민
+	pos[1] = train_length - 3; // 좀비
+	pos[2] = train_length - 2; // 마동석
+	isSwitch = 0; //기본 false
+}
 
 //열차 초기 상태 출력 -> (개정) 열차 상태 출력 함수
 void printTrainState(int train_length, int pos[], char symbols[]) {
@@ -51,7 +58,7 @@ void printStatus(char *string, int state, int pos) {
 }
 
 //시민 이동 구현 (확률계산까지)
-int citizen_move(int citizen_state, int probability) {
+int citizenMove(int probability) {
 	//(100-p)%확률로 시민 이동
 	if ((rand() % 100) < (100 - probability)) {
 		pos[0] -= 1;
@@ -64,17 +71,37 @@ int citizen_move(int citizen_state, int probability) {
 }
 
 //좀비 이동 구현(확률계산까지)
-void zombie_move(int isSwitch, int zombie_state) {
-
+int zombieMove(int zombie_state, int probability) {
+	if (!isSwitch) { //isSwitch가 0일때(첫실행)
+		//(100-p)%의 확률로 제자리에 대기
+		//100 + 1하면 0~99 -> 1~100으로 뽑힘
+		if ((rand() % 100) < (100 - probability)) {
+			printf("[debug] IF isSwitch : %d\n", isSwitch);
+			printf("[debug] IF isSwitch : %d\n", isSwitch);
+			isSwitch = 1; //턴스위칭
+			return 2; //좀비 대기
+		}
+		else { //p%의 확률로 1칸이동
+			pos[1] -= 1;
+			printf("[debug] IFELSE isSwitch : %d\n", isSwitch);
+			isSwitch = 1; //턴스위칭
+			return 1;
+		}
+	}
+	else { //isSwitch가 1일때
+		isSwitch = 0; //턴스위칭
+		printf("[debug] ELSE isSwitch : %d\n", isSwitch);
+		return 3; //강제 정지
+		//리턴 : state
+	}
 }
 
 //메인
 int main() {
 	//변수
 	int train_length, probability;		//(입력) 열차 길이, 이동 확률
-	int isSwitch;						//턴 스위치
-	int citizen_state;					// 초기화
-	int zombie_state;					// 초기화
+	int citizen_state = 0;					// 초기화
+	int zombie_state = 0;					// 초기화
 	srand((unsigned int)time(NULL));	//랜덤 모듈 초기화
 
 	//인트로
@@ -105,12 +132,7 @@ int main() {
 	
 
 	// 위치 초기화
-	pos[0] = train_length - 6; // 시민
-	pos[1] = train_length - 3; // 좀비
-	pos[2] = train_length - 2; // 마동석
-	isSwitch = 0; //기본 false
-	zombie_state = 0;
-	citizen_state = 0;
+	initTrain(train_length); //열차 길이에 따른 위치 초기화
 
 	//초기 열차 상태 출력
 	printTrainState(train_length, pos, symbols);
@@ -122,37 +144,43 @@ int main() {
 		if (pos[0] == 1 || pos[1] - pos[0] <= 1) {
 			break;
 		}
+		printf("[턴 시작]\n");
 
 		//★=====시민 이동=====★ //100-p확률로 이동
-		//미구현) 확률 적용하여 이동시 state=1, 정지시 state=2
-		citizen_state = citizen_move(citizen_state, probability); 
+		//확률 적용하여 이동시 state=1, 정지시 state=2
+		printf("[시민 이동]\n");
+		citizen_state = citizenMove(citizen_state, probability); 
 
 
 		//★=====좀비 이동=====★
+		// 미구현 zombie_move()
+		printf("[좀비 이동]\n");
+		zombie_state = zombieMove(zombie_state, probability);
 		//만약 1턴이고, (100 - p)% 
-		if (!isSwitch) {
-			if ((rand()%100) < (100-probability)) {
-				//p%의 확률로 이동
-				pos[1] -= 1;
-				zombie_state = 2; //이동
-			}
-			else {
-				//(100-p)% 확률로 제자리에 대기
-				zombie_state = 1;
-			}
-			isSwitch = 1;
-		}
-		else{ //2턴
-			zombie_state = 3; //강제 대기
-			isSwitch = 0;
-		}
+		//if (!isSwitch) {
+		//	if ((rand()%100) < (100-probability)) {
+		//		//p%의 확률로 이동
+		//		pos[1] -= 1;
+		//		zombie_state = 2; //이동
+		//	}
+		//	else {
+		//		//(100-p)% 확률로 제자리에 대기
+		//		zombie_state = 1;
+		//	}
+		//	isSwitch = 1;
+		//}
+		//else{ //2턴
+		//	zombie_state = 3; //강제 대기
+		//	isSwitch = 0;
+		//}
 
-		Sleep(4000);
+		printf("[열차 상태 출력]\n");
 		printTrainState(train_length, pos, symbols);
 
 		//시민, 좀비 상태 출력
 		printStatus("citizen", citizen_state, pos[0]);
 		printStatus("zombie", zombie_state, pos[1]);
+		Sleep(4000); //4초 대기
 	}
 
 	//아웃트로 - 종료상태 출력(성공/실패)
