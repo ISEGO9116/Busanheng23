@@ -7,7 +7,7 @@
 #define PROB_MIN	10 // 확률
 #define PROB_MAX	90
 
-//commit test
+//commit test2
 
 //전역 변수
 int pos[3]; // 0: 시민, 1: 좀비, 2: 마동석
