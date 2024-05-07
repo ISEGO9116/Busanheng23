@@ -30,8 +30,23 @@ int pos[3]; // 0: 시민, 1: 좀비, 2: 마동석
 char symbols[3] = { 'C', 'Z', 'M' }; //시민/좀비/마동석의 심볼
 int isSwitch = 0; //턴 스위치
 
+//입력 함수
+int Input(char *string, int min, int max) {
+	//단축하려면 
+	// 파라미터로 문자열 train length(%d~%d)>> 넣고,
+	// 범위값 LEN_MIN, LEN_MAX 넣고,
+	// 자체적으로 do while로 오류없을때까지 입력받음
+	// 내부적으로 scanf_s에 담아서 return해야 할 듯
+	int _input;
+	do {
+		printf(string, min, max); //string에 들어있는 변환문자의 표현을 위해 사용함.
+		scanf_s("%d", &_input);
+	} while (_input < min || _input > max);
+	return _input;
+}
+
 //열차 상태 초기화
-void initTrain(int train_length) {
+void init_Train(int train_length) {
 	pos[0] = train_length - 6; // 시민
 	pos[1] = train_length - 3; // 좀비
 	pos[2] = train_length - 2; // 마동석
@@ -39,7 +54,7 @@ void initTrain(int train_length) {
 }
 
 //열차 상태 출력 함수
-void printTrainState(int train_length, int pos[], char symbols[]) {
+void print_TrainState(int train_length, int pos[], char symbols[]) {
 	printf("\n");
 	for (int i = 0; i < 3; i++) //3줄
 	{
@@ -60,7 +75,7 @@ void printTrainState(int train_length, int pos[], char symbols[]) {
 }
 
 //상태표
-void printStatus(char *string, int state, int pos) {
+void print_Status(char *string, int state, int pos) {
 	if (state == 1) { //1 : 이동
 		printf("%s: %d -> %d\n", string, pos + 1, pos);
 	}
@@ -73,7 +88,7 @@ void printStatus(char *string, int state, int pos) {
 }
 
 //시민 이동 구현 (확률계산까지)
-int citizenMove(int probability) {
+int citizen_Move(int probability) {
 	//(100-p)%확률로 시민 이동
 	int _chance = rand() % 100;
 	if (_chance < (100-probability)) {
@@ -87,7 +102,7 @@ int citizenMove(int probability) {
 }
 
 //좀비 이동 구현(확률계산까지)
-int zombieMove(int probability) {
+int zombie_Move(int probability) {
 	if (!isSwitch) { //isSwitch가 0일때(첫실행)
 		//(100-p)%의 확률로 제자리에 대기
 		if ((rand() % 100) < (100 - probability)) {
@@ -121,10 +136,15 @@ void GameOver() {
 	}
 }
 
+// =================================================================================
+
 //메인
 int main() {
 	//변수
-	int train_length, probability;		//(입력) 열차 길이, 이동 확률
+	int train_length = 0;				// 열차 길이
+	int stamina = 0;					//
+	int probability = 0;				//이동 확률
+	
 	int citizen_state = 0;				// 초기화
 	int zombie_state = 0;				// 초기화
 	srand((unsigned int)time(NULL));	//랜덤 모듈 초기화
@@ -137,27 +157,21 @@ int main() {
 	while (1)
 	{
 		//train length
-		do {
-			printf("train length(%d~%d)>>", LEN_MIN, LEN_MAX);
-			scanf_s("%d", &train_length);
-		} while (train_length < LEN_MIN || train_length > LEN_MAX);
+		train_length = Input("train length(%d~%d)>>", LEN_MIN, LEN_MAX);
+		stamina = Input("madongseok stamina(%d~%d)>>", STM_MIN, STM_MAX);
+		probability = Input("percentile probability 'p'(%d~%d)>>", PROB_MIN, PROB_MAX);
 
 		//마동석
 		//미구현
-
-		do {
-			printf("percentile probability 'p'(%d~%d)>>", PROB_MIN, PROB_MAX);
-			scanf_s("%d", &probability);
-		} while (probability < PROB_MIN || probability > PROB_MAX);
 		//여기까지 도착한거면 통과
 		break;
 	}
 	
 	// 위치 초기화
-	initTrain(train_length); //열차 길이에 따른 위치 초기화
+	init_Train(train_length); //열차 길이에 따른 위치 초기화
 
 	//초기 열차 상태 출력
-	printTrainState(train_length, pos, symbols);
+	print_TrainState(train_length, pos, symbols);
 
 	//메인로직(시민이동, 좀비이동, 열차상태 출력, 시민/좀비 상태 출력
 	while (1)
@@ -167,17 +181,17 @@ int main() {
 		}
 
 		//★=====시민 이동=====★
-		citizen_state = citizenMove(probability); //이동시 state=1, 정지시 state=2
+		citizen_state = citizen_Move(probability); //이동시 state=1, 정지시 state=2
 
 		//★=====좀비 이동=====★
-		zombie_state = zombieMove(probability);
+		zombie_state = zombie_Move(probability);
 
 		//열차 상태 출력
-		printTrainState(train_length, pos, symbols);
+		print_TrainState(train_length, pos, symbols);
 
 		//시민, 좀비 상태 출력
-		printStatus("citizen", citizen_state, pos[0]);
-		printStatus("zombie", zombie_state, pos[1]);
+		print_Status("citizen", citizen_state, pos[0]);
+		print_Status("zombie", zombie_state, pos[1]);
 	}
 
 	GameOver(); //아웃트로 - 종료상태 출력(성공/실패)
