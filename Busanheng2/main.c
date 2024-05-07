@@ -22,7 +22,7 @@
 
 //마동석 행동
 #define ACTION_REST		0
-#define ACTION_PROVOKE	1 //도발하기? 어그로 증가하기?
+#define ACTION_PROVOKE	1 //도발하기?
 #define ACTION_PULL		2 //붙들기
 
 //전역 변수
