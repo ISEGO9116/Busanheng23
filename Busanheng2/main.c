@@ -72,6 +72,7 @@ void print_TrainState(int train_length) {
 		}
 		printf("\n"); //3줄 출력후 줄 바꾸기
 	}
+	printf("\n");
 }
 
 //상태표
@@ -88,14 +89,16 @@ void print_Status(char *string, int state, int pos) {
 }
 
 //마동석 전용 출력함수 (마동석 state와 어그로 변화량을 받음)
-// 1 : stay
-// 2 : 
-void print_DongseokPrint(int state, int aggroDelta) {
-	if (state == 0) { //휴식
-		printf("madongseok: stay %d (aggro: %d->%d)\n", pos[2], (aggro[1] + 1), aggro[1]);
+// 1 : 휴식
+// 2 : 이동(어그로1 증가)
+void print_DongseokPrint(int state, int aggroDelta, int stamina) {
+	if (state == 0) { //휴식 (어그로1 감소)
+		aggro[1] = cal_AddSubForClampMax(aggro[1], -1, 5, AGGRO_MIN);
+		printf("madongseok: stay %d (aggro: %d->%d, stamina: %d)\n", pos[2], (aggro[1] + 1), aggro[1], stamina);
 	}
 	else if (state == 1) { //이동(어그로1 증가)
-		printf("madongseok: %d -> %d (aggro: %d->%d)\n", (pos[2]+1), pos[2], aggro[1], (aggro[1] + aggroDelta));
+		aggro[1] = cal_AddSubForClampMax(aggro[1], 1, AGGRO_MAX, 0); //5를 넘지 않는다.
+		printf("madongseok: %d -> %d (aggro: %d->%d, stamina: %d)\n", (pos[2] + 1), pos[2], (aggro[1] - 1), aggro[1], stamina);
 	}
 }
 
@@ -135,18 +138,19 @@ int zombie_Move(int probability) {
 
 //마동석 이동 : 
 // 0/1 입력받아서 행동, 기차 상태 출력
-void dongseok_Move(int train_length) {
+void dongseok_Move(int train_length, int stamina) {
+	printf("\n");
 	int dongseok_state = Input("madongseok move(0:stay, 1:left)>>", 0, 1);
 	if (dongseok_state) { //1 입력시,
 		pos[2] -= 1; //한칸 이동
 		print_TrainState(train_length); //기차 상태 출력
-		print_DongseokPrint(dongseok_state, 1); //마동석 상태 출력
+		print_DongseokPrint(dongseok_state, 1, stamina); //마동석 상태 출력
 	}
 	else { //0 입력시,
 		// 제자리에 대기 (바로 기차 상태 출력하니까 아무것도 안한다?)
 		print_TrainState(train_length);
 		print_Status("madongseok", dongseok_state, pos[2]);
-		print_DongseokPrint(dongseok_state, 0); //마동석 상태 출력
+		print_DongseokPrint(dongseok_state, 0, stamina); //마동석 상태 출력
 	}
 }
 
@@ -155,13 +159,26 @@ void GameOver() {
 	if (pos[0] == 1) {
 		printf("SUCCESS!\n");
 		printf("citizen(s) escaped to the next train");
-		printf("\n============================");//
+		printf("\n============================");
 	}
 	else if (pos[1] - pos[0] <= 1) {
 		printf("GAME OVER!\n");
 		printf("Citizen(s) has(have) been attacked by a zombie\n");
 		printf("\n============================");
 	}
+}
+
+//숫자를 증가시키는 함수(최대값 이후로는 거부한다.)
+// cal_AddForClampMax(베이스 숫자, 증가치, 최대치)
+int cal_AddSubForClampMax(int num, int delta_num, int max_num, int min_num) {
+	num += delta_num;
+	if (num > max_num) {
+		num = max_num; //최대치로 고정
+	}
+	else if (num < min_num) {
+		num = min_num;
+	}
+	return num;
 }
 
 // =================================================================================
@@ -191,7 +208,6 @@ int main() {
 	//★=====턴=====★
 	while (1)
 	{
-		printf("\n");
 		if (pos[0] == 1 || pos[1] - pos[0] <= 1) {
 			break; //조건 체크후 반복문 탈출 (시민 탈출 조건 충족 OR 좀비-시민(=거리) 1이하)
 		}
@@ -206,7 +222,7 @@ int main() {
 		print_Status("citizen", citizen_state, pos[0]);
 		print_Status("zombie", zombie_state, pos[1]);
 		//마동석 이동
-		dongseok_Move(train_length); //수치 변동까지 완료
+		dongseok_Move(train_length, stamina); //수치 변동까지 완료
 		//마동석 상태 출력
 
 		//★=====<행동> 페이즈=====★
