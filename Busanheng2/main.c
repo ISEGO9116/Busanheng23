@@ -7,6 +7,8 @@
 #define PROB_MIN	10 // 확률
 #define PROB_MAX	90
 
+//commit test
+
 //전역 변수
 int pos[3]; // 0: 시민, 1: 좀비, 2: 마동석
 char symbols[3] = { 'C', 'Z', 'M' }; //시민/좀비/마동석의 심볼
