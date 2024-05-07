@@ -20,7 +20,7 @@ void initTrain(int train_length) {
 	isSwitch = 0; //기본 false
 }
 
-//열차 초기 상태 출력 -> (개정) 열차 상태 출력 함수
+//열차 상태 출력 함수
 void printTrainState(int train_length, int pos[], char symbols[]) {
 	printf("\n");
 	for (int i = 0; i < 3; i++) //3줄
@@ -42,17 +42,14 @@ void printTrainState(int train_length, int pos[], char symbols[]) {
 }
 
 //상태표
-//1 : 이동
-//2 : 정지
-//3 : 강제 정지
 void printStatus(char *string, int state, int pos) {
-	if (state == 1) {
+	if (state == 1) { //1 : 이동
 		printf("%s: %d -> %d\n", string, pos + 1, pos);
 	}
-	else if (state == 2) {
+	else if (state == 2) { //2 : 정지
 		printf("%s: stay %d\n", string, pos);
 	}
-	else if (state == 3) {
+	else if (state == 3) { //3 : 강제 정지
 		printf("%s: Stay %d (cannot move)\n", string, pos);
 	}
 }
@@ -60,11 +57,9 @@ void printStatus(char *string, int state, int pos) {
 //시민 이동 구현 (확률계산까지)
 int citizenMove(int probability) {
 	//(100-p)%확률로 시민 이동
-	printf("probability : %d\n", probability);
 	int _chance = rand() % 100;
 	if (_chance < (100-probability)) {
 		pos[0] -= 1;
-		printf("%d < %d\n", _chance, (100-probability));
 		return 1; //state: 시민 이동
 	}
 	else {
@@ -77,7 +72,6 @@ int citizenMove(int probability) {
 int zombieMove(int probability) {
 	if (!isSwitch) { //isSwitch가 0일때(첫실행)
 		//(100-p)%의 확률로 제자리에 대기
-		//100 + 1하면 0~99 -> 1~100으로 뽑힘
 		if ((rand() % 100) < (100 - probability)) {
 			isSwitch = 1; //턴스위칭
 			return 2; //좀비 대기
@@ -95,18 +89,19 @@ int zombieMove(int probability) {
 	}
 }
 
-void GameOver() { //게임종료.
+//게임종료.
+void GameOver() { 
 	if (pos[0] == 1) {
 		printf("SUCCESS!\n");
 		printf("citizen(s) escaped to the next train");
+		printf("\n============================");
 	}
 	else if (pos[1] - pos[0] <= 1) {
 		printf("GAME OVER!\n");
 		printf("Citizen(s) has(have) been attacked by a zombie\n");
+		printf("\n============================");
 	}
 }
-
-
 
 //메인
 int main() {
@@ -124,24 +119,18 @@ int main() {
 	while (1)
 	{
 		//train length
-		printf("train length(%d~%d)>>", LEN_MIN, LEN_MAX);
-		scanf_s("%d", &train_length);
-		if (train_length < LEN_MIN || train_length > LEN_MAX) {
-			continue;
-		}
+		do {
+			printf("train length(%d~%d)>>", LEN_MIN, LEN_MAX);
+			scanf_s("%d", &train_length);
+		} while (train_length < LEN_MIN || train_length > LEN_MAX);
+
 		//마동석
 		//미구현
 
-		//확률
-		while (1)
-		{
+		do {
 			printf("percentile probability 'p'(%d~%d)>>", PROB_MIN, PROB_MAX);
 			scanf_s("%d", &probability);
-			if (probability < PROB_MIN || probability > PROB_MAX) {
-				continue;
-			}
-			break;
-		}
+		} while (probability < PROB_MIN || probability > PROB_MAX);
 		//여기까지 도착한거면 통과
 		break;
 	}
@@ -160,32 +149,19 @@ int main() {
 		}
 
 		//★=====시민 이동=====★
-		//확률 적용하여 이동시 state=1, 정지시 state=2
-		citizen_state = citizenMove(probability); 
+		citizen_state = citizenMove(probability); //이동시 state=1, 정지시 state=2
 
 		//★=====좀비 이동=====★
 		zombie_state = zombieMove(probability);
 
+		//열차 상태 출력
 		printTrainState(train_length, pos, symbols);
 
 		//시민, 좀비 상태 출력
 		printStatus("citizen", citizen_state, pos[0]);
 		printStatus("zombie", zombie_state, pos[1]);
-		Sleep(4000); //4초 대기
 	}
 
-	//아웃트로 - 종료상태 출력(성공/실패)
-	//미구현 
-	GameOver();
-	//if (pos[0] == 1) {
-	//	printf("SUCCESS!\n");
-	//	printf("citizen(s) escaped to the next train");
-	//}
-	//else if (pos[1] - pos[0] <= 1) {
-	//	printf("GAME OVER!\n");
-	//	printf("Citizen(s) has(have) been attacked by a zombie\n");
-	//}
-
-	printf("\n============================");
+	GameOver(); //아웃트로 - 종료상태 출력(성공/실패)
 	return 0;
 }
